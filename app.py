@@ -1,177 +1,176 @@
 import os
-import sys
 import pandas as pd
-from openai import AzureOpenAI
+import plotly.express as px
+import streamlit as st
 
-# ==========================================
-# 1. CONFIGURAÇÕES E CREDENCIAIS
-# ==========================================
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://seu-endpoint.openai.azure.com/")
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "sua-chave-api")
-AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
-AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
+# Configuração da página
+st.set_page_config(
+    page_title="Painel Executivo de Sinistros",
+    page_icon="🚗",
+    layout="wide"
+)
 
-EXCEL_FILE = "Acompanhamento de sinistros em andamento 26102026.xlsx"
-OUTPUT_REPORT = "painel_executivo_sinistros.md"
+st.title("🚗 Painel Executivo de Sinistros & Gestão de Risco")
+st.markdown("Consolidação gerencial de processos em andamento extraídos do Pipefy.")
 
-# ==========================================
-# 2. PROMPT DO SISTEMA (ESPECIALISTA EM SINISTROS)
-# ==========================================
-SYSTEM_PROMPT = """Você é o especialista sênior em gestão de sinistros corporativos e inteligência de dados de seguros do sistema SinistroIA.
-Sua única responsabilidade é receber dados brutos (tabelas, exportações em CSV, JSON ou texto tabulado) extraídos do Pipefy e consolidar um painel executivo estruturado para a Diretoria e áreas de Operações/Obras, detalhando gargalos operacionais, sinistralidade por obra, status de liquidação e perfil de frota.
-
-### Objetivos e Estrutura do Relatório:
-
-1. Resumo Executivo (Visão Geral):
-   - Total de ocorrências reportadas vs. Sinistros efetivamente abertos na seguradora.
-   - Taxa de conversão/abertura (Sinistros Abertos / Ocorrências Totais).
-   - Volume total pago (indenizações recebidas) vs. Valores pendentes/estimados.
-   - Divisão proporcional de envolvidos: Veículo Segurado (Frota Própria/Alugada) vs. Terceiros.
-
-2. Gargalos e Pendências Operacionais (Pipeline Pipefy):
-   - Pendente de Abertura: Ocorrências internas que ainda não viraram sinistro por falta de dados básicos (B.O., condutor, relato do fato).
-   - Pendente de Documentação: Sinistros já comunicados, mas travados por falta de documentos internos (CNH, CRLV, orçamentos, termo de cessão).
-   - Em Análise na Seguradora/Reguladora: Processos sob regulação técnica, perícia de terceiros ou aprovação de orçamento pela seguradora.
-
-3. Indicadores de Gestão de Risco e Diretoria:
-   - Acidentes e Sinistros por Obra/Centro de Custo: Volume absoluto e representatividade percentual.
-   - Principais Causas: Ranking categorizado dos motivos (ex.: colisão traseira, tombamento, manobra imprudente, terceiros, eventos da natureza).
-
-4. Gestão Financeira e Liquidação:
-   - Casos Indenizados/Liquidados: Data exata da indenização, valor pago (R$) e beneficiário (Segurado ou Terceiro).
-   - Casos Deferidos/Negados: Status e justificativa se houver.
-
-5. Perfil de Frota e Locações:
-   - Classificação do veículo: Frota Própria vs. Locado.
-   - Veículos Locados: Locadora de origem, responsável pela locação/condutor e obra/setor alocador.
-
-### Regras de Execução e Consolidação:
-1. Trate os dados com precisão numérica: valores monetários no formato padrão brasileiro (R$ X.XXX,XX) e datas no formato DD/MM/AAAA.
-2. Não invente ou presuma informações ausentes. Se uma linha do Pipefy estiver sem valor indenizado, condutor ou locadora, aponte explicitamente como "Não informado" ou "Pendente de preenchimento".
-3. Diferencie rigorosamente:
-   - "Ocorrência / Aviso Interno": registro criado no Pipefy que ainda aguarda validação.
-   - "Sinistro Aberto": processo com número de sinistro gerado junto à seguradora/corretora.
-   - "Indenizado": valor efetivamente pago e quitado pela seguradora.
-4. Mantenha tom formal, analítico, objetivo e direto, próprio para reporte executivo a Diretores e Gerentes de Contrato.
-
-### Formato de Saída (Markdown):
-# PAINEL EXECUTIVO DE SINISTROS & GESTÃO DE RISCO
-
-## 1. Visão Geral da Carteira
-| Métrica | Quantidade / Valor | % / Detalhe |
-| :--- | :--- | :--- |
-| Ocorrências Totais Registradas | [Qtd] | 100% |
-| Sinistros com Abertura Concluída | [Qtd] | [% do total] |
-| Ocorrências em Fase Pré-Sinistro | [Qtd] | [% do total] |
-| Total Indenizado (Pago) | R$ [Valor] | [Qtd de sinistros pagos] |
-| Indenizações: Segurado | R$ [Valor] | [Qtd] |
-| Indenizações: Terceiros | R$ [Valor] | [Qtd] |
-
-## 2. Status do Fluxo e Gargalos de Regulação
-- **Pendentes para Abertura de Sinistro:** [X casos] — *Principais pendências*.
-- **Pendentes de Documentação Interna/Oficina:** [X casos] — *Documentos faltantes*.
-- **Em Análise na Seguradora/Reguladora:** [X casos] — *Status*.
-
-## 3. Sinistralidade por Obra e Causas Raiz
-### Ocorrências por Obra / Centro de Custo
-| Obra / Unidade | Total Ocorrências | Sinistros Efetivos | Sinistros Pagos (R$) |
-| :--- | :--- | :--- | :--- |
-
-### Principais Causas Identificadas
-1. **[Causa 1]:** [Qtd] casos ([%] do total)
-2. **[Causa 2]:** [Qtd] casos ([%] do total)
-
-## 4. Relação Detalhada de Pagamentos e Indenizações
-| N° Sinistro / Card | Obra | Tipo (Segurado/Terceiro) | Data Indenização | Valor Pago (R$) | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-
-## 5. Panorama de Veículos e Locações
-| Placa / Prefixo | Veículo (Modelo) | Tipo de Frota | Locadora | Condutor / Obra Alocada |
-| :--- | :--- | :--- | :--- | :--- |
-"""
-
-def carregar_e_filtrar_dados(caminho_arquivo: str) -> str:
-    """Lê a planilha exportada do Pipefy e filtra apenas os status em andamento."""
-    print(f"[*] Carregando arquivo: {caminho_arquivo}")
-    df = pd.read_excel(caminho_arquivo)
+# Função para carregar os dados
+@st.cache_data
+def carregar_dados(uploaded_file=None):
+    caminho_padrao = "Acompanhamento de sinistros em andamento 26102026.xlsx"
     
-    col_status = None
+    if uploaded_file is not None:
+        df = pd.read_excel(uploaded_file)
+    elif os.path.exists(caminho_padrao):
+        df = pd.read_excel(caminho_padrao)
+    else:
+        return None
+        
+    # Localizar coluna de fase
+    col_fase = None
     for col in ["Fase atual", "Status", "Fase", "status"]:
         if col in df.columns:
-            col_status = col
+            col_fase = col
             break
             
-    if not col_status:
-        raise ValueError(f"Coluna de status não encontrada. Colunas disponíveis: {df.columns.tolist()}")
-
-    df[col_status] = df[col_status].astype(str)
+    if col_fase is None:
+        st.error("Coluna de status/fase não encontrada na planilha.")
+        return None
+        
+    df["Fase_Normalizada"] = df[col_fase].astype(str).str.strip().str.lower()
     
-    # Filtro exato das fases em andamento solicitadas
+    # Filtrar estritamente os status em andamento solicitados
     fases_alvo = ["acompanhamento de sinistro", "análise do incidente", "analise do incidente"]
-    df_filtrado = df[df[col_status].str.strip().str.lower().isin(fases_alvo)].copy()
+    df_filtrado = df[df["Fase_Normalizada"].isin(fases_alvo)].copy()
     
-    print(f"[+] Total de ocorrências na planilha: {len(df)}")
-    print(f"[+] Ocorrências em andamento filtradas: {len(df_filtrado)}")
-    
-    if df_filtrado.empty:
-        print("[!] Nenhum registro encontrado com os status especificados.")
-        sys.exit(0)
-        
-    dados_formatados = []
-    for idx, row in df_filtrado.iterrows():
-        item = []
-        for col_name, val in row.items():
-            if pd.notna(val) and str(val).strip() != "":
-                item.append(f"- **{col_name}**: {val}")
-        dados_formatados.append(f"### REGISTRO {idx + 1}\n" + "\n".join(item))
-        
-    return "\n\n---\n\n".join(dados_formatados)
+    return df_filtrado
 
-def gerar_painel_ia(dados_str: str) -> str:
-    """Envia os dados consolidados para o modelo de IA e obtém o relatório executivo."""
-    print("[*] Conectando ao modelo de IA e gerando painel executivo...")
-    
-    client = AzureOpenAI(
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-        api_key=AZURE_OPENAI_API_KEY,
-        api_version=AZURE_API_VERSION
+# Barra lateral
+with st.sidebar:
+    st.header("⚙️ Base de Dados")
+    uploaded_file = st.file_uploader("Carregar nova planilha (.xlsx)", type=["xlsx", "xls"])
+    st.info("Filtro ativo: apenas **Acompanhamento de Sinistro** e **Análise do Incidente**.")
+
+df = carregar_dados(uploaded_file)
+
+if df is None or df.empty:
+    st.warning("⚠️ Nenhuma ocorrência em andamento encontrada ou o arquivo Excel não foi localizado. Por favor, anexe a planilha pelo menu lateral à esquerda.")
+    st.stop()
+
+# ==========================================
+# 1. RESUMO EXECUTIVO (MÉTRICAS)
+# ==========================================
+st.subheader("1. Visão Geral da Carteira")
+
+total_ocorrencias = len(df)
+sinistros_abertos = len(df[df["Fase_Normalizada"] == "acompanhamento de sinistro"])
+fase_analise = len(df[df["Fase_Normalizada"].str.contains("análise|analise", na=False)])
+
+val_terceiro = pd.to_numeric(df.get("Valor Indenizável (terceiro)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
+val_segurado = pd.to_numeric(df.get("Valor Indenizável", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
+total_valor = val_terceiro + val_segurado
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Ocorrências em Andamento", f"{total_ocorrencias}")
+col2.metric("Sinistros Abertos", f"{sinistros_abertos}", f"{(sinistros_abertos/total_ocorrencias*100):.1f}%")
+col3.metric("Em Análise Prévia", f"{fase_analise}", f"{(fase_analise/total_ocorrencias*100):.1f}%")
+col4.metric("Indenização Estimada", f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+st.divider()
+
+# ==========================================
+# 2. GARGALOS E PENDÊNCIAS
+# ==========================================
+st.subheader("2. Gargalos e Pendências Operacionais")
+
+col_left, col_right = st.columns([1, 1])
+
+with col_left:
+    st.markdown("#### Distribuição por Fase")
+    fig_fase = px.pie(
+        df, 
+        names="Fase atual", 
+        hole=0.4,
+        color_discrete_sequence=["#1f77b4", "#ff7f0e"]
     )
-    
-    user_prompt = f"""Consolide o Painel Executivo de Sinistros com base exclusivamente nos seguintes registros em andamento filtrados do Pipefy:\n\n{dados_str}"""
-    
-    response = client.chat.completions.create(
-        model=AZURE_OPENAI_DEPLOYMENT,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.1
-    )
-    
-    return response.choices[0].message.content
+    st.plotly_chart(fig_fase, use_container_width=True)
 
-def main():
-    if not os.path.exists(EXCEL_FILE):
-        print(f"[!] Erro: Arquivo '{EXCEL_FILE}' não encontrado.")
-        return
-
-    dados_filtrados_str = carregar_e_filtrar_dados(EXCEL_FILE)
-    
-    # Se a chave da API ainda for a padrão de exemplo, salva os dados filtrados prontos
-    if AZURE_OPENAI_API_KEY == "sua-chave-api":
-        print("\n[!] Chave de API ainda não configurada no script.")
-        print("[*] Exportando os registros filtrados em 'dados_filtrados_prontos.txt' para conferência...")
-        with open("dados_filtrados_prontos.txt", "w", encoding="utf-8") as f:
-            f.write(dados_filtrados_str)
-        print("[✓] Arquivo 'dados_filtrados_prontos.txt' salvo com sucesso!")
-        return
-
-    painel_markdown = gerar_painel_ia(dados_filtrados_str)
-    
-    with open(OUTPUT_REPORT, "w", encoding="utf-8") as f:
-        f.write(painel_markdown)
+with col_right:
+    st.markdown("#### Detalhamento de Pendências")
+    for idx, row in df.iterrows():
+        fase = row.get("Fase atual", "N/A")
+        titulo = row.get("Título", "Sem Título")
+        comentario = str(row.get("Último comentário", "")).strip()
         
-    print(f"[✓] Painel Executivo gerado com sucesso em '{OUTPUT_REPORT}'!")
+        with st.expander(f"📌 {titulo} — [{fase}]"):
+            st.markdown(f"**Local/Endereço:** {row.get('Informe a obra ou endereço completo do ocorrido:', 'Não informado')}")
+            st.markdown(f"**Causa:** {row.get('Informe a Causa', 'Não informada')} ({row.get('Informe o tipo da ocorrencia', '')})")
+            st.markdown(f"**Atualizado em:** {row.get('Atualizado em', '-')}")
+            if comentario and comentario.lower() != "nan":
+                st.info(f"**Anotações e Pendências:**\n\n{comentario}")
+            else:
+                st.write("*Sem comentários registrados no card.*")
 
-if __name__ == "__main__":
-    main()
+st.divider()
+
+# ==========================================
+# 3. SINISTRALIDADE POR OBRA E CAUSAS
+# ==========================================
+st.subheader("3. Sinistralidade por Obra e Causas")
+
+col_g1, col_g2 = st.columns(2)
+
+with col_g1:
+    col_obra = "Informe a Obra a qual a ocorrencia está relacionada:"
+    obra_counts = df[col_obra].fillna("Não informado / Operacional").value_counts().reset_index()
+    obra_counts.columns = ["Obra / Locação", "Quantidade"]
+    
+    fig_obra = px.bar(
+        obra_counts, 
+        x="Obra / Locação", 
+        y="Quantidade", 
+        title="Ocorrências por Obra / Alocação",
+        color="Quantidade",
+        text="Quantidade"
+    )
+    st.plotly_chart(fig_obra, use_container_width=True)
+
+with col_g2:
+    causas_counts = df["Informe o tipo da ocorrencia"].fillna("Outros").value_counts().reset_index()
+    causas_counts.columns = ["Tipo da Ocorrência", "Quantidade"]
+    
+    fig_causas = px.bar(
+        causas_counts, 
+        x="Tipo da Ocorrência", 
+        y="Quantidade", 
+        title="Principais Causas Identificadas",
+        color="Quantidade",
+        text="Quantidade",
+        color_continuous_scale="Reds"
+    )
+    st.plotly_chart(fig_causas, use_container_width=True)
+
+st.divider()
+
+# ==========================================
+# 4. TABELA GERAL DETALHADA
+# ==========================================
+st.subheader("4. Relação Geral de Processos em Andamento")
+
+colunas_exibir = [
+    "Título", 
+    "Fase atual", 
+    "Informe a Obra a qual a ocorrencia está relacionada:", 
+    "Informe a Causa",
+    "Acionado seguro para ",
+    "Número do sinistro (segurado)", 
+    "Número do sinistro (terceiro)",
+    "Valor Indenizável (terceiro)",
+    "Último comentário"
+]
+colunas_validas = [c for c in colunas_exibir if c in df.columns]
+
+st.dataframe(
+    df[colunas_validas].fillna("-"),
+    use_container_width=True,
+    hide_index=True
+)
