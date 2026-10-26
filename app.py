@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Configuração da página em tela cheia sem barra lateral
+# Configuração da página
 st.set_page_config(
     page_title="Painel Executivo de Sinistros",
     page_icon="🚗",
@@ -18,10 +18,9 @@ st.markdown(
 )
 
 
-# Leitura direta da planilha armazenada no repositório do GitHub
+# Função para localizar e carregar a planilha diretamente do repositório
 @st.cache_data
 def carregar_dados_repositorio():
-  # Localiza a planilha específica ou qualquer arquivo .xlsx versionado no GitHub
   caminho_especifico = "Acompanhamento de sinistros em andamento 26102026.xlsx"
   caminho_arquivo = None
 
@@ -37,7 +36,7 @@ def carregar_dados_repositorio():
 
   df = pd.read_excel(caminho_arquivo)
 
-  # Identifica a coluna de status
+  # Localizar coluna de fase/status
   col_fase = None
   for col in ["Fase atual", "Status", "Fase", "status"]:
     if col in df.columns:
@@ -50,7 +49,7 @@ def carregar_dados_repositorio():
 
   df["Fase_Normalizada"] = df[col_fase].astype(str).str.strip().str.lower()
 
-  # Filtro estrito: apenas processos em andamento
+  # Filtrar estritamente os status em andamento
   fases_alvo = [
       "acompanhamento de sinistro",
       "análise do incidente",
@@ -66,7 +65,7 @@ df = carregar_dados_repositorio()
 if df is None or df.empty:
   st.error(
       "⚠️ Planilha não localizada no repositório do GitHub. Certifique-se de"
-      " que o arquivo .xlsx foi enviado para a raiz do repositório."
+      " que o arquivo .xlsx está na raiz do repositório."
   )
   st.stop()
 
@@ -138,21 +137,23 @@ with col_left:
 
 with col_right:
   st.markdown("#### Detalhamento de Pendências")
+  col_local = "Informe a obra ou endereço completo do ocorrido:"
+  col_causa = "Informe a Causa"
+  col_tipo = "Informe o tipo da ocorrencia"
+
   for idx, row in df.iterrows():
     fase = row.get("Fase atual", "N/A")
     titulo = row.get("Título", "Sem Título")
     comentario = str(row.get("Último comentário", "")).strip()
+    local = row.get(col_local, "Não informado")
+    causa = row.get(col_causa, "Não informada")
+    tipo = row.get(col_tipo, "")
+    atualizado = row.get("Atualizado em", "-")
 
     with st.expander(f"📌 {titulo} — [{fase}]"):
-      st.markdown(
-          f"**Local/Endereço:** {row.get('Informe a obra ou endereço completo do"
-          " ocorrido:', 'Não informado')}"
-      )
-      st.markdown(
-          f"**Causa:** {row.get('Informe a Causa', 'Não informada')} "
-          f"({row.get('Informe o tipo da ocorrencia', '')})"
-      )
-      st.markdown(f"**Atualizado em:** {row.get('Atualizado em', '-')}")
+      st.markdown(f"**Local/Endereço:** {local}")
+      st.markdown(f"**Causa:** {causa} ({tipo})")
+      st.markdown(f"**Atualizado em:** {atualizado}")
       if comentario and comentario.lower() != "nan":
         st.info(f"**Anotações e Pendências:**\n\n{comentario}")
       else:
