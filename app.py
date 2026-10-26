@@ -14,51 +14,49 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Estilização CSS personalizada para replicar o modelo dos cartões executivos
+# Estilização CSS para visual executivo e correção de tabelas
 st.markdown(
     """
 <style>
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: bold; }
     
-    /* Cartões executivos inferiores */
     .dest-card {
         border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 12px;
-        height: 100%;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        padding: 14px;
+        margin-bottom: 15px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
     .dest-header {
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 14px;
+        gap: 10px;
+        margin-bottom: 12px;
     }
     .dest-icon {
-        width: 44px;
-        height: 44px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
+        font-size: 20px;
     }
     .dest-title {
-        font-size: 1.05rem;
+        font-size: 0.98rem;
         font-weight: 700;
         margin: 0;
         line-height: 1.2;
     }
     .dest-subtitle {
-        font-size: 0.82rem;
+        font-size: 0.80rem;
         color: #6b7280;
         margin: 0;
     }
     .item-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.84rem;
+        font-size: 0.82rem;
         background-color: #ffffff;
         border-radius: 8px;
         overflow: hidden;
@@ -66,26 +64,26 @@ st.markdown(
     .item-table th {
         background-color: #f3f4f6;
         color: #374151;
-        padding: 8px 10px;
+        padding: 6px 8px;
         font-weight: 600;
         text-align: left;
         border-bottom: 1px solid #e5e7eb;
     }
     .item-table td {
-        padding: 8px 10px;
+        padding: 6px 8px;
         border-bottom: 1px solid #f3f4f6;
         color: #1f2937;
         vertical-align: middle;
     }
     .item-num {
-        width: 32px;
-        height: 32px;
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.80rem;
     }
 </style>
 """,
@@ -283,14 +281,7 @@ df["CC_Padronizado"] = (
     if col_cc
     else "Não informado / Operacional"
 )
-df["Item_Numero"] = [i + 1 for i in range(len(df))]
 df["Item_ID"] = [f"#{i + 1}" for i in range(len(df))]
-df["Item_Veiculo"] = (
-    df["Título"]
-    .fillna("Veículo não especificado")
-    .astype(str)
-    .str.strip()
-)
 
 # ==========================================
 # 1. RESUMO EXECUTIVO (MÉTRICAS)
@@ -414,11 +405,12 @@ with col_right:
 st.divider()
 
 # ==========================================
-# 3. SINISTRALIDADE POR DESTINAÇÃO / CC (MODELO EXECUTIVO INFOGRÁFICO)
+# 3. SINISTRALIDADE POR DESTINAÇÃO / CC E MOTIVOS DAS OCORRÊNCIAS
 # ==========================================
-st.subheader("3. Sinistralidade por Destinação / Centro de Custo (CC)")
+st.subheader("3. Sinistralidade por Destinação (CC) e Motivos das Ocorrências")
 
-# Paleta de cores corporativa alinhada ao modelo da imagem
+col_g1, col_g2 = st.columns([1.1, 0.9])
+
 paleta_cores = {
     0: {
         "bar": "#2b70b8",
@@ -475,55 +467,106 @@ bar_colors = [
     for i in range(len(df_agrupado))
 ]
 
-# 1. Gráfico no modelo da imagem (barras limpas com totais no topo e grid suave)
-fig_modelo = go.Figure()
+with col_g1:
+  # 1. Gráfico das Destinações / Obras
+  fig_dest = go.Figure()
+  fig_dest.add_trace(
+      go.Bar(
+          x=df_agrupado["CC_Padronizado"],
+          y=df_agrupado["Quantidade"],
+          text=df_agrupado["Quantidade"],
+          textposition="outside",
+          textfont=dict(size=15, family="Arial, sans-serif", color="#111827"),
+          marker=dict(
+              color=bar_colors, line=dict(color="rgba(0,0,0,0.1)", width=1)
+          ),
+          width=0.45,
+      )
+  )
 
-fig_modelo.add_trace(
-    go.Bar(
-        x=df_agrupado["CC_Padronizado"],
-        y=df_agrupado["Quantidade"],
-        text=df_agrupado["Quantidade"],
-        textposition="outside",
-        textfont=dict(size=16, family="Arial, sans-serif", color="#111827"),
-        marker=dict(
-            color=bar_colors, line=dict(color="rgba(0,0,0,0.1)", width=1)
-        ),
-        width=0.45,
-    )
-)
+  max_val_dest = df_agrupado["Quantidade"].max() if not df_agrupado.empty else 2
+  fig_dest.update_layout(
+      title=dict(
+          text=(
+              "<b>Ocorrências por Destinação / CC</b><br><span"
+              " style='font-size:12px;color:#6b7280;font-weight:normal;'>Volume"
+              " por Unidade / Locação</span>"
+          ),
+          x=0.01,
+          y=0.96,
+      ),
+      yaxis=dict(
+          title="Quantidade de Ocorrências",
+          range=[0, max_val_dest + 0.6],
+          gridcolor="#e5e7eb",
+          showline=True,
+          linecolor="#9ca3af",
+          tickmode="linear",
+          tick0=0,
+          dtick=0.5,
+      ),
+      xaxis=dict(title="", showline=True, linecolor="#9ca3af", tickangle=-15),
+      plot_bgcolor="#ffffff",
+      paper_bgcolor="#ffffff",
+      margin=dict(t=65, b=40, l=50, r=10),
+      height=350,
+  )
+  st.plotly_chart(fig_dest, use_container_width=True)
 
-max_val = df_agrupado["Quantidade"].max() if not df_agrupado.empty else 2
-fig_modelo.update_layout(
-    title=dict(
-        text=(
-            "<b>Ocorrências por Destinação / Centro de Custo"
-            " (CC)</b><br><span"
-            " style='font-size:13px;color:#6b7280;font-weight:normal;'>Detalhamento"
-            " por Itens / Veículos</span>"
-        ),
-        x=0.01,
-        y=0.96,
-    ),
-    yaxis=dict(
-        title="Quantidade<br>de Ocorrências",
-        range=[0, max_val + 0.6],
-        gridcolor="#e5e7eb",
-        showline=True,
-        linecolor="#9ca3af",
-        tickmode="linear",
-        tick0=0,
-        dtick=0.5,
-    ),
-    xaxis=dict(title="", showline=True, linecolor="#9ca3af"),
-    plot_bgcolor="#ffffff",
-    paper_bgcolor="#ffffff",
-    margin=dict(t=70, b=40, l=60, r=20),
-    height=370,
-)
+with col_g2:
+  # 2. Gráfico dos Motivos das Ocorrências (Principais Causas)
+  col_tipo_ocorr = "Informe o tipo da ocorrencia"
+  col_causa_raiz = "Informe a Causa"
 
-st.plotly_chart(fig_modelo, use_container_width=True)
+  coluna_motivo = (
+      col_tipo_ocorr if col_tipo_ocorr in df.columns else col_causa_raiz
+  )
+  serie_motivos = df[coluna_motivo].fillna("Outros").astype(str).str.strip()
+  serie_motivos = serie_motivos.replace({"nan": "Outros", "": "Outros"})
+  motivos_counts = serie_motivos.value_counts().reset_index()
+  motivos_counts.columns = ["Motivo / Tipo", "Quantidade"]
 
-# 2. Cartões Executivos Inferiores (Detalhamento por Item/Veículo)
+  fig_motivos = px.bar(
+      motivos_counts,
+      x="Motivo / Tipo",
+      y="Quantidade",
+      text="Quantidade",
+      title=(
+          "<b>Principais Motivos das Ocorrências</b><br><span"
+          " style='font-size:12px;color:#6b7280;font-weight:normal;'>Distribuição"
+          " por Causa Raiz</span>"
+      ),
+      color="Quantidade",
+      color_continuous_scale="Reds",
+  )
+  fig_motivos.update_traces(
+      textposition="outside",
+      textfont=dict(size=15, family="Arial, sans-serif", color="#111827"),
+      width=0.45,
+  )
+  max_val_mot = (
+      motivos_counts["Quantidade"].max() if not motivos_counts.empty else 4
+  )
+  fig_motivos.update_layout(
+      yaxis=dict(
+          title="Quantidade",
+          range=[0, max_val_mot + 1],
+          gridcolor="#e5e7eb",
+          showline=True,
+          linecolor="#9ca3af",
+      ),
+      xaxis=dict(title="", showline=True, linecolor="#9ca3af"),
+      plot_bgcolor="#ffffff",
+      paper_bgcolor="#ffffff",
+      margin=dict(t=65, b=40, l=40, r=10),
+      height=350,
+      coloraxis_showscale=False,
+  )
+  st.plotly_chart(fig_motivos, use_container_width=True)
+
+# 3. Cartões Executivos Inferiores com Detalhamento dos Itens
+st.markdown("#### 📋 Detalhamento dos Itens por Destinação")
+
 num_destinacoes = len(df_agrupado)
 if num_destinacoes > 0:
   card_cols = st.columns(num_destinacoes)
@@ -532,59 +575,72 @@ if num_destinacoes > 0:
     nome_cc = row_cc["CC_Padronizado"]
     total_cc = row_cc["Quantidade"]
     itens_cc = df[df["CC_Padronizado"] == nome_cc].reset_index(drop=True)
-
     estilo = paleta_cores.get(i % len(paleta_cores))
 
-    linhas_tabela = ""
+    linhas_html = []
     for n_item, item_row in itens_cc.iterrows():
       titulo_item = item_row.get("Título", "Item não especificado")
       sinistro_val = item_row.get(col_sinistro_seg) or item_row.get(
           col_sinistro_ter
       )
-      sinistro_info = (
-          f" <span style='font-size:0.75rem;color:#6b7280;'>(Sinistro"
-          f" {formatar_sinistro(sinistro_val)})</span>"
-          if pd.notna(sinistro_val)
-          else ""
+      sinistro_info = ""
+      if (
+          pd.notna(sinistro_val)
+          and str(sinistro_val).strip() != ""
+          and str(sinistro_val).lower() != "nan"
+      ):
+        sinistro_info = (
+            " <span style='font-size:0.75rem;color:#6b7280;'>(Sinistro "
+            + formatar_sinistro(sinistro_val)
+            + ")</span>"
+        )
+
+      linha = (
+          "<tr><td style='text-align:center; width:35px;'><span"
+          " class='item-num' style='background-color:"
+          + estilo["icon_bg"]
+          + "; color:"
+          + estilo["badge"]
+          + ";'>"
+          + str(n_item + 1)
+          + "</span></td><td style='line-height:1.3;'><b>"
+          + str(titulo_item)
+          + "</b>"
+          + sinistro_info
+          + "</td></tr>"
       )
+      linhas_html.append(linha)
 
-      linhas_tabela += f"""
-            <tr>
-                <td style="text-align: center; width: 40px;">
-                    <span class="item-num" style="background-color: {estilo['icon_bg']}; color: {estilo['badge']};">
-                        {n_item + 1}
-                    </span>
-                </td>
-                <td style="line-height: 1.3;">
-                    <b>{titulo_item}</b>{sinistro_info}
-                </td>
-            </tr>
-            """
+    tabela_corpo = "".join(linhas_html)
 
-    html_card = f"""
-        <div class="dest-card" style="background-color: {estilo['bg']}; border: 1.5px solid {estilo['border']};">
-            <div class="dest-header">
-                <div class="dest-icon" style="background-color: {estilo['icon_bg']};">
-                    {estilo['icon']}
-                </div>
-                <div>
-                    <h4 class="dest-title">{nome_cc}</h4>
-                    <p class="dest-subtitle">Total: {total_cc} ocorrência{'s' if total_cc > 1 else ''}</p>
-                </div>
-            </div>
-            <table class="item-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px; text-align: center;">Nº</th>
-                        <th>Item / Veículo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {linhas_tabela}
-                </tbody>
-            </table>
-        </div>
-        """
+    html_card = (
+        "<div class='dest-card' style='background-color:"
+        + estilo["bg"]
+        + "; border:1.5px solid "
+        + estilo["border"]
+        + ";'>"
+        "<div class='dest-header'>"
+        "<div class='dest-icon' style='background-color:"
+        + estilo["icon_bg"]
+        + ";'>"
+        + estilo["icon"]
+        + "</div>"
+        "<div><h4 class='dest-title'>"
+        + str(nome_cc)
+        + "</h4>"
+        "<p class='dest-subtitle'>Total: "
+        + str(total_cc)
+        + " ocorrência"
+        + ("s" if total_cc > 1 else "")
+        + "</p></div>"
+        "</div>"
+        "<table class='item-table'>"
+        "<thead><tr><th style='width:35px; text-align:center;'>Nº</th><th>Item"
+        " / Veículo</th></tr></thead>"
+        "<tbody>" + tabela_corpo + "</tbody>"
+        "</table>"
+        "</div>"
+    )
 
     with card_cols[i]:
       st.markdown(html_card, unsafe_allow_html=True)
