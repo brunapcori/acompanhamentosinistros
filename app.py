@@ -1,3 +1,4 @@
+from datetime import datetime
 import glob
 import os
 import pandas as pd
@@ -12,37 +13,52 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.title("🚗 Painel Executivo de Sinistros & Gestão de Risco")
+# Estilização CSS para visual executivo
 st.markdown(
-    "Consolidação gerencial de processos em andamento extraídos do Pipefy."
+    """
+<style>
+    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: bold; }
+</style>
+""",
+    unsafe_allow_html=True,
 )
 
 
-# Função para carregar a planilha mais recente do repositório
-@st.cache_data
+# Leitura direta da planilha mais recente do repositório (sem cache bloqueante)
 def carregar_dados_repositorio():
-  arquivos = [f for f in glob.glob("*.xlsx") if not f.startswith("~$")]
+  arquivos = [
+      f for f in glob.glob("*.xlsx") if not os.path.basename(f).startswith("~$")
+  ]
   if not arquivos:
-    return None
+    return None, None, None
 
-  # Seleciona sempre a planilha mais recente pela data de modificação
+  # Seleciona sempre o arquivo mais recente pela data de modificação
   arquivo_mais_recente = max(arquivos, key=os.path.getmtime)
+  data_modificacao = datetime.fromtimestamp(
+      os.path.getmtime(arquivo_mais_recente)
+  ).strftime("%d/%m/%Y às %H:%M")
+
   df = pd.read_excel(arquivo_mais_recente)
 
-  # Localiza a coluna de fase/status
+  # Identificar coluna de status/fase
   col_fase = None
-  for col in ["Fase atual", "Status", "Fase", "status"]:
-    if col in df.columns:
+  for col in df.columns:
+    col_norm = str(col).strip().lower()
+    if col_norm in ["fase atual", "status", "fase"]:
       col_fase = col
       break
 
   if col_fase is None:
-    st.error("Coluna de status/fase não encontrada na planilha.")
-    return None
+    return (
+        None,
+        arquivo_mais_recente,
+        "Coluna de status/fase não localizada na planilha.",
+    )
 
   df["Fase_Normalizada"] = df[col_fase].astype(str).str.strip().str.lower()
 
-  # Filtro estrito para status em andamento
+  # Filtro estrito: apenas processos em andamento
   fases_alvo = [
       "acompanhamento de sinistro",
       "análise do incidente",
@@ -50,35 +66,52 @@ def carregar_dados_repositorio():
   ]
   df_filtrado = df[df["Fase_Normalizada"].isin(fases_alvo)].copy()
 
-  return df_filtrado
+  return df_filtrado, arquivo_mais_recente, data_modificacao
 
 
-df = carregar_dados_repositorio()
+df, nome_arquivo, info_data = carregar_dados_repositorio()
+
+# Cabeçalho Principal e Indicador da Planilha Ativa
+st.title("🚗 Painel Executivo de Sinistros & Gestão de Risco")
+if nome_arquivo:
+  st.caption(
+      f"📁 **Base ativa carregada:** `{nome_arquivo}` | **Última"
+      f" atualização:** {info_data}"
+  )
+else:
+  st.error(
+      "⚠️ Nenhuma planilha Excel (.xlsx) encontrada na raiz do repositório."
+  )
+  st.stop()
 
 if df is None or df.empty:
-  st.error(
-      "⚠️ Nenhuma ocorrência em andamento encontrada ou planilha não localizada"
-      " no repositório."
+  st.warning(
+      "⚠️ Não foram encontrados registros com status 'Acompanhamento de"
+      " Sinistro' ou 'Análise do Incidente' na planilha ativa."
   )
   st.stop()
 
 # ==========================================
-# MAPEAMENTO DA COLUNA DE CC / OBRA
+# IDENTIFICAÇÃO DINÂMICA DA COLUNA CC / OBRA
 # ==========================================
 col_cc = None
 for col in df.columns:
-  col_limpa = str(col).strip().lower()
-  if col_limpa in ["cc", "c.c.", "c.c", "centro de custo", "centro de custos"]:
+  c_limpo = str(col).strip().lower()
+  if c_limpo in ["cc", "c.c.", "c.c", "centro de custo", "centro de custos"]:
     col_cc = col
     break
 
-# Se não achar exatamente "CC", usa a coluna de obra como alternativa
 if not col_cc:
-  for col in [
-      "Informe a Obra a qual a ocorrencia está relacionada:",
-      "Informe a obra ou endereço completo do ocorrido:",
-  ]:
-    if col in df.columns:
+  for col in df.columns:
+    c_limpo = str(col).strip().lower()
+    if "informe a obra a qual" in c_limpo or "obra relacionada" in c_limpo:
+      col_cc = col
+      break
+
+if not col_cc:
+  for col in df.columns:
+    c_limpo = str(col).strip().lower()
+    if "obra ou endereço" in c_limpo or "obra" in c_limpo:
       col_cc = col
       break
 
@@ -110,19 +143,26 @@ val_segurado = (
 )
 total_valor = val_terceiro + val_segurado
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Ocorrências em Andamento", f"{total_ocorrencias}")
-col2.metric(
-    "Sinistros Abertos",
+pct_sinistros = (
+    (sinistros_abertos / total_ocorrencias * 100) if total_ocorrencias > 0 else 0
+)
+pct_analise = (
+    (fase_analise / total_ocorrencias * 100) if total_ocorrencias > 0 else 0
+)
+
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Ocorrências em Andamento", f"{total_ocorrencias}")
+m2.metric(
+    "Sinistros Abertos (Regulação)",
     f"{sinistros_abertos}",
-    f"{(sinistros_abertos/total_ocorrencias*100):.1f}%",
+    f"{pct_sinistros:.1f}% do total",
 )
-col3.metric(
-    "Em Análise Prévia",
+m3.metric(
+    "Em Análise Prévia (Incidente)",
     f"{fase_analise}",
-    f"{(fase_analise/total_ocorrencias*100):.1f}%",
+    f"{pct_analise:.1f}% do total",
 )
-col4.metric(
+m4.metric(
     "Indenização Estimada",
     f"R$ {total_valor:,.2f}".replace(",", "X")
     .replace(".", ",")
@@ -132,7 +172,7 @@ col4.metric(
 st.divider()
 
 # ==========================================
-# 2. GARGALOS E PENDÊNCIAS
+# 2. GARGALOS E PENDÊNCIAS OPERACIONAIS
 # ==========================================
 st.subheader("2. Gargalos e Pendências Operacionais")
 
@@ -143,32 +183,41 @@ with col_left:
   fig_fase = px.pie(
       df,
       names="Fase atual",
-      hole=0.4,
+      hole=0.45,
       color_discrete_sequence=["#1f77b4", "#ff7f0e"],
   )
+  fig_fase.update_layout(margin=dict(t=20, b=20, l=10, r=10))
   st.plotly_chart(fig_fase, use_container_width=True)
 
 with col_right:
-  st.markdown("#### Detalhamento de Pendências")
+  st.markdown("#### Detalhamento de Pendências Registradas")
   col_local = "Informe a obra ou endereço completo do ocorrido:"
   col_causa = "Informe a Causa"
   col_tipo = "Informe o tipo da ocorrencia"
 
   for idx, row in df.iterrows():
     fase = row.get("Fase atual", "N/A")
-    titulo = row.get("Título", "Sem Título")
+    titulo = row.get("Título", f"Ocorrência #{idx + 1}")
     comentario = str(row.get("Último comentário", "")).strip()
-    cc_valor = row.get(col_cc, "Não informado") if col_cc else "Não informado"
-    local = row.get(col_local, "Não informado")
-    causa = row.get(col_causa, "Não informada")
-    tipo = row.get(col_tipo, "")
-    atualizado = row.get("Atualizado em", "-")
+
+    cc_val = row.get(col_cc, "Não informado") if col_cc else "Não informado"
+    if (
+        pd.isna(cc_val)
+        or str(cc_val).strip() == ""
+        or str(cc_val).lower() == "nan"
+    ):
+      cc_val = "Não informado / Operacional"
+
+    local_val = row.get(col_local, "Não informado")
+    causa_val = row.get(col_causa, "Não informada")
+    tipo_val = row.get(col_tipo, "")
+    atualizado_val = row.get("Atualizado em", "-")
 
     with st.expander(f"📌 {titulo} — [{fase}]"):
-      st.markdown(f"**CC / Obra:** {cc_valor}")
-      st.markdown(f"**Local/Endereço:** {local}")
-      st.markdown(f"**Causa:** {causa} ({tipo})")
-      st.markdown(f"**Atualizado em:** {atualizado}")
+      st.markdown(f"**CC / Obra:** {cc_val}")
+      st.markdown(f"**Local/Endereço:** {local_val}")
+      st.markdown(f"**Causa / Tipo:** {causa_val} ({tipo_val})")
+      st.markdown(f"**Atualizado em:** {atualizado_val}")
       if comentario and comentario.lower() != "nan":
         st.info(f"**Anotações e Pendências:**\n\n{comentario}")
       else:
@@ -185,42 +234,57 @@ col_g1, col_g2 = st.columns(2)
 
 with col_g1:
   if col_cc:
-    cc_counts = (
+    serie_cc = (
         df[col_cc]
         .fillna("Não informado / Operacional")
-        .value_counts()
-        .reset_index()
+        .astype(str)
+        .str.strip()
     )
+    serie_cc = serie_cc.replace(
+        {"nan": "Não informado / Operacional", "": "Não informado / Operacional"}
+    )
+    cc_counts = serie_cc.value_counts().reset_index()
     cc_counts.columns = ["Centro de Custo (CC)", "Quantidade"]
 
     fig_cc = px.bar(
         cc_counts,
         x="Centro de Custo (CC)",
         y="Quantidade",
-        title="Ocorrências por Centro de Custo (CC)",
+        title="Ocorrências por Centro de Custo (CC) / Obra",
         color="Quantidade",
         text="Quantidade",
+        color_continuous_scale="Blues",
+    )
+    fig_cc.update_layout(
+        xaxis_tickangle=-25, margin=dict(t=40, b=60, l=10, r=10)
     )
     st.plotly_chart(fig_cc, use_container_width=True)
   else:
-    st.warning("Coluna 'CC' não encontrada na planilha.")
+    st.warning("Coluna 'CC' ou de Obra não localizada para gerar o gráfico.")
 
 with col_g2:
-  causas_counts = (
-      df["Informe o tipo da ocorrencia"].fillna("Outros").value_counts().reset_index()
-  )
-  causas_counts.columns = ["Tipo da Ocorrência", "Quantidade"]
+  col_tipo_ocorr = "Informe o tipo da ocorrencia"
+  if col_tipo_ocorr in df.columns:
+    serie_causas = (
+        df[col_tipo_ocorr].fillna("Outros").astype(str).str.strip()
+    )
+    serie_causas = serie_causas.replace({"nan": "Outros", "": "Outros"})
+    causas_counts = serie_causas.value_counts().reset_index()
+    causas_counts.columns = ["Tipo da Ocorrência", "Quantidade"]
 
-  fig_causas = px.bar(
-      causas_counts,
-      x="Tipo da Ocorrência",
-      y="Quantidade",
-      title="Principais Causas Identificadas",
-      color="Quantidade",
-      text="Quantidade",
-      color_continuous_scale="Reds",
-  )
-  st.plotly_chart(fig_causas, use_container_width=True)
+    fig_causas = px.bar(
+        causas_counts,
+        x="Tipo da Ocorrência",
+        y="Quantidade",
+        title="Principais Causas Identificadas",
+        color="Quantidade",
+        text="Quantidade",
+        color_continuous_scale="Reds",
+    )
+    fig_causas.update_layout(
+        xaxis_tickangle=-25, margin=dict(t=40, b=60, l=10, r=10)
+    )
+    st.plotly_chart(fig_causas, use_container_width=True)
 
 st.divider()
 
@@ -229,7 +293,7 @@ st.divider()
 # ==========================================
 st.subheader("4. Relação Geral de Processos em Andamento")
 
-colunas_exibir = [
+colunas_desejadas = [
     "Título",
     "Fase atual",
     col_cc if col_cc else "Informe a Obra a qual a ocorrencia está relacionada:",
@@ -240,7 +304,7 @@ colunas_exibir = [
     "Valor Indenizável (terceiro)",
     "Último comentário",
 ]
-colunas_validas = [c for c in colunas_exibir if c and c in df.columns]
+colunas_validas = [c for c in colunas_desejadas if c and c in df.columns]
 
 st.dataframe(
     df[colunas_validas].fillna("-"), use_container_width=True, hide_index=True
