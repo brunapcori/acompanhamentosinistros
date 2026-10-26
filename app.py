@@ -202,6 +202,26 @@ col_data_ter = [
 ]
 col_data_ter = col_data_ter[0] if col_data_ter else None
 
+
+# Limpeza e Padronização do Centro de Custo / Locação
+def padronizar_cc(val):
+  if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+    return "Não informado / Operacional"
+  return str(val).strip()
+
+
+df["CC_Padronizado"] = (
+    df[col_cc].apply(padronizar_cc)
+    if col_cc
+    else "Não informado / Operacional"
+)
+df["Item_Veiculo"] = (
+    df["Título"]
+    .fillna("Veículo não especificado")
+    .astype(str)
+    .str.strip()
+)
+
 # ==========================================
 # 1. RESUMO EXECUTIVO (MÉTRICAS)
 # ==========================================
@@ -277,17 +297,12 @@ with col_right:
     titulo = row.get("Título", f"Ocorrência #{idx + 1}")
     comentario = str(row.get("Último comentário", "")).strip()
 
-    # CC
-    cc_val = str(row.get(col_cc, "")).strip() if col_cc else ""
-    if not cc_val or cc_val.lower() == "nan":
-      cc_val = "Não informado / Operacional"
-
+    cc_val = row.get("CC_Padronizado", "Não informado / Operacional")
     local_val = row.get(col_local, "Não informado")
     causa_val = row.get(col_causa, "Não informada")
     tipo_val = row.get(col_tipo, "")
     atualizado_val = row.get("Atualizado em", "-")
 
-    # Dados de Sinistro e Indenização
     sinistro_seg = (
         formatar_sinistro(row.get(col_sinistro_seg)) if col_sinistro_seg else "-"
     )
@@ -302,11 +317,10 @@ with col_right:
 
     with st.expander(f"📌 {titulo} — [{fase}]"):
       st.markdown(f"**🚗 Veículo / Descrição:** {titulo}")
-      st.markdown(f"**🏢 Centro de Custo (CC):** `{cc_val}`")
+      st.markdown(f"**🏢 Centro de Custo / Locação:** `{cc_val}`")
       st.markdown(f"**📍 Local/Endereço:** {local_val}")
       st.markdown(f"**⚠️ Causa / Tipo:** {causa_val} ({tipo_val})")
 
-      # Bloco de Informações de Sinistro e Indenização
       st.markdown("---")
       st.markdown("**📋 Dados do Sinistro e Indenizações:**")
       c_seg, c_ter = st.columns(2)
@@ -329,36 +343,41 @@ with col_right:
 st.divider()
 
 # ==========================================
-# 3. SINISTRALIDADE POR CC E CAUSAS
+# 3. SINISTRALIDADE POR CC E IDENTIFICAÇÃO DOS ITENS
 # ==========================================
-st.subheader("3. Sinistralidade por Centro de Custo (CC) e Causas")
+st.subheader(
+    "3. Sinistralidade por Centro de Custo (CC) e Identificação dos Itens"
+)
 
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
-  if col_cc:
-    serie_cc = df[col_cc].astype(str).str.strip()
-    serie_cc = serie_cc.replace(
-        {"nan": "Não informado / Operacional", "": "Não informado / Operacional"}
-    )
-    cc_counts = serie_cc.value_counts().reset_index()
-    cc_counts.columns = ["Centro de Custo (CC)", "Quantidade"]
-
-    fig_cc = px.bar(
-        cc_counts,
-        x="Centro de Custo (CC)",
-        y="Quantidade",
-        title="Ocorrências por Centro de Custo (CC)",
-        color="Quantidade",
-        text="Quantidade",
-        color_continuous_scale="Blues",
-    )
-    fig_cc.update_layout(
-        xaxis_tickangle=-30, margin=dict(t=40, b=80, l=10, r=10)
-    )
-    st.plotly_chart(fig_cc, use_container_width=True)
-  else:
-    st.warning("⚠️ Coluna 'CC' não foi encontrada na planilha.")
+  # Gráfico detalhado com identificação visual dos veículos/itens envolvidos
+  fig_cc = px.bar(
+      df,
+      x="CC_Padronizado",
+      color="Item_Veiculo",
+      title="Ocorrências por Destinação / CC (Detalhamento por Item/Veículo)",
+      labels={
+          "CC_Padronizado": "Centro de Custo / Destinação",
+          "Item_Veiculo": "Item / Veículo",
+          "count": "Quantidade",
+      },
+      barmode="stack",
+  )
+  fig_cc.update_layout(
+      xaxis_tickangle=-25,
+      margin=dict(t=40, b=80, l=10, r=10),
+      legend=dict(
+          title="Itens Envolvidos",
+          orientation="h",
+          yanchor="top",
+          y=-0.35,
+          xanchor="center",
+          x=0.5,
+      ),
+  )
+  st.plotly_chart(fig_cc, use_container_width=True)
 
 with col_g2:
   col_tipo_ocorr = "Informe o tipo da ocorrencia"
@@ -384,6 +403,31 @@ with col_g2:
     )
     st.plotly_chart(fig_causas, use_container_width=True)
 
+# Bloco explicativo com a lista exata dos itens por CC / Locação
+st.markdown("#### 📋 Relação de Itens e Veículos por Locação / Obra")
+
+grupos_cc = df.groupby("CC_Padronizado")
+cols_grid = st.columns(min(len(grupos_cc), 3))
+
+for idx_g, (nome_cc, grupo) in enumerate(grupos_cc):
+  col_idx = idx_g % min(len(grupos_cc), 3)
+  with cols_grid[col_idx]:
+    st.info(
+        f"**🏢 {nome_cc}** ({len(grupo)} ocorrência{'s' if len(grupo) > 1 else ''})"
+    )
+    for _, item in grupo.iterrows():
+      fase_item = item.get("Fase atual", "")
+      veiculo_item = item.get("Título", "Veículo não especificado")
+      sinistro_num = item.get(col_sinistro_seg) or item.get(col_sinistro_ter)
+      sinistro_txt = (
+          f" | Sinistro: `{formatar_sinistro(sinistro_num)}`"
+          if pd.notna(sinistro_num)
+          else ""
+      )
+      st.markdown(
+          f"- 🚗 **{veiculo_item}**\n  ↳ *Fase:* `{fase_item}`{sinistro_txt}"
+      )
+
 st.divider()
 
 # ==========================================
@@ -394,9 +438,7 @@ st.subheader("4. Relação Geral: Veículos, Sinistros e Valores Indenizados")
 tabela_executiva = pd.DataFrame()
 tabela_executiva["Veículo / Ocorrência"] = df["Título"].fillna("Não informado")
 tabela_executiva["Fase Atual"] = df["Fase atual"].fillna("-")
-tabela_executiva["Centro de Custo (CC)"] = (
-    df[col_cc].fillna("Não informado") if col_cc else "Não informado"
-)
+tabela_executiva["Centro de Custo (CC)"] = df["CC_Padronizado"]
 
 # Sinistro Segurado
 tabela_executiva["N° Sinistro (Segurado)"] = (
