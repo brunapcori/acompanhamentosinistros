@@ -18,25 +18,18 @@ st.markdown(
 )
 
 
-# Função para localizar e carregar a planilha diretamente do repositório
+# Função para carregar a planilha mais recente do repositório
 @st.cache_data
 def carregar_dados_repositorio():
-  caminho_especifico = "Acompanhamento de sinistros em andamento 26102026.xlsx"
-  caminho_arquivo = None
-
-  if os.path.exists(caminho_especifico):
-    caminho_arquivo = caminho_especifico
-  else:
-    arquivos_xlsx = [f for f in glob.glob("*.xlsx") if not f.startswith("~$")]
-    if arquivos_xlsx:
-      caminho_arquivo = arquivos_xlsx[0]
-
-  if not caminho_arquivo:
+  arquivos = [f for f in glob.glob("*.xlsx") if not f.startswith("~$")]
+  if not arquivos:
     return None
 
-  df = pd.read_excel(caminho_arquivo)
+  # Seleciona sempre a planilha mais recente pela data de modificação
+  arquivo_mais_recente = max(arquivos, key=os.path.getmtime)
+  df = pd.read_excel(arquivo_mais_recente)
 
-  # Localizar coluna de fase/status
+  # Localiza a coluna de fase/status
   col_fase = None
   for col in ["Fase atual", "Status", "Fase", "status"]:
     if col in df.columns:
@@ -49,7 +42,7 @@ def carregar_dados_repositorio():
 
   df["Fase_Normalizada"] = df[col_fase].astype(str).str.strip().str.lower()
 
-  # Filtrar estritamente os status em andamento
+  # Filtro estrito para status em andamento
   fases_alvo = [
       "acompanhamento de sinistro",
       "análise do incidente",
@@ -64,10 +57,30 @@ df = carregar_dados_repositorio()
 
 if df is None or df.empty:
   st.error(
-      "⚠️ Planilha não localizada no repositório do GitHub. Certifique-se de"
-      " que o arquivo .xlsx está na raiz do repositório."
+      "⚠️ Nenhuma ocorrência em andamento encontrada ou planilha não localizada"
+      " no repositório."
   )
   st.stop()
+
+# ==========================================
+# MAPEAMENTO DA COLUNA DE CC / OBRA
+# ==========================================
+col_cc = None
+for col in df.columns:
+  col_limpa = str(col).strip().lower()
+  if col_limpa in ["cc", "c.c.", "c.c", "centro de custo", "centro de custos"]:
+    col_cc = col
+    break
+
+# Se não achar exatamente "CC", usa a coluna de obra como alternativa
+if not col_cc:
+  for col in [
+      "Informe a Obra a qual a ocorrencia está relacionada:",
+      "Informe a obra ou endereço completo do ocorrido:",
+  ]:
+    if col in df.columns:
+      col_cc = col
+      break
 
 # ==========================================
 # 1. RESUMO EXECUTIVO (MÉTRICAS)
@@ -145,12 +158,14 @@ with col_right:
     fase = row.get("Fase atual", "N/A")
     titulo = row.get("Título", "Sem Título")
     comentario = str(row.get("Último comentário", "")).strip()
+    cc_valor = row.get(col_cc, "Não informado") if col_cc else "Não informado"
     local = row.get(col_local, "Não informado")
     causa = row.get(col_causa, "Não informada")
     tipo = row.get(col_tipo, "")
     atualizado = row.get("Atualizado em", "-")
 
     with st.expander(f"📌 {titulo} — [{fase}]"):
+      st.markdown(f"**CC / Obra:** {cc_valor}")
       st.markdown(f"**Local/Endereço:** {local}")
       st.markdown(f"**Causa:** {causa} ({tipo})")
       st.markdown(f"**Atualizado em:** {atualizado}")
@@ -162,31 +177,33 @@ with col_right:
 st.divider()
 
 # ==========================================
-# 3. SINISTRALIDADE POR OBRA E CAUSAS
+# 3. SINISTRALIDADE POR CC (OBRA) E CAUSAS
 # ==========================================
-st.subheader("3. Sinistralidade por Obra e Causas")
+st.subheader("3. Sinistralidade por Centro de Custo (CC) e Causas")
 
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
-  col_obra = "Informe a Obra a qual a ocorrencia está relacionada:"
-  obra_counts = (
-      df[col_obra]
-      .fillna("Não informado / Operacional")
-      .value_counts()
-      .reset_index()
-  )
-  obra_counts.columns = ["Obra / Locação", "Quantidade"]
+  if col_cc:
+    cc_counts = (
+        df[col_cc]
+        .fillna("Não informado / Operacional")
+        .value_counts()
+        .reset_index()
+    )
+    cc_counts.columns = ["Centro de Custo (CC)", "Quantidade"]
 
-  fig_obra = px.bar(
-      obra_counts,
-      x="Obra / Locação",
-      y="Quantidade",
-      title="Ocorrências por Obra / Alocação",
-      color="Quantidade",
-      text="Quantidade",
-  )
-  st.plotly_chart(fig_obra, use_container_width=True)
+    fig_cc = px.bar(
+        cc_counts,
+        x="Centro de Custo (CC)",
+        y="Quantidade",
+        title="Ocorrências por Centro de Custo (CC)",
+        color="Quantidade",
+        text="Quantidade",
+    )
+    st.plotly_chart(fig_cc, use_container_width=True)
+  else:
+    st.warning("Coluna 'CC' não encontrada na planilha.")
 
 with col_g2:
   causas_counts = (
@@ -215,7 +232,7 @@ st.subheader("4. Relação Geral de Processos em Andamento")
 colunas_exibir = [
     "Título",
     "Fase atual",
-    "Informe a Obra a qual a ocorrencia está relacionada:",
+    col_cc if col_cc else "Informe a Obra a qual a ocorrencia está relacionada:",
     "Informe a Causa",
     "Acionado seguro para ",
     "Número do sinistro (segurado)",
@@ -223,7 +240,7 @@ colunas_exibir = [
     "Valor Indenizável (terceiro)",
     "Último comentário",
 ]
-colunas_validas = [c for c in colunas_exibir if c in df.columns]
+colunas_validas = [c for c in colunas_exibir if c and c in df.columns]
 
 st.dataframe(
     df[colunas_validas].fillna("-"), use_container_width=True, hide_index=True
