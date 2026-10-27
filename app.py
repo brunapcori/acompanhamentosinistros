@@ -6,84 +6,210 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-# Configuração da página
+# ==============================================================================
+# CONFIGURAÇÃO DA PÁGINA
+# ==============================================================================
 st.set_page_config(
-    page_title="Painel Executivo de Sinistros",
-    page_icon="🚗",
+    page_title="Gestão de Sinistros | Ellenco",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# Estilização CSS para visual executivo e correção de tabelas
+# ==============================================================================
+# IDENTIDADE VISUAL E ESTILIZAÇÃO CORPORATIVA (ELLENCO)
+# Cores Oficiais: Azul Ellenco (#154474) e Vermelho Ellenco (#EE3E3F)
+# ==============================================================================
 st.markdown(
     """
 <style>
-    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: bold; }
+    /* Tipografia e espaçamentos globais */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     
-    .dest-card {
-        border-radius: 12px;
-        padding: 14px;
-        margin-bottom: 15px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
+    
+    .block-container {
+        padding-top: 1.2rem;
+        padding-bottom: 2.5rem;
+        max-width: 98% !important;
+    }
+
+    /* Top Bar Corporativa */
+    .ellenco-header {
+        background: linear-gradient(135deg, #103358 0%, #154474 60%, #1b5694 100%);
+        border-radius: 12px;
+        padding: 20px 28px;
+        color: #ffffff;
+        margin-bottom: 22px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 4px solid #EE3E3F;
+        box-shadow: 0 4px 14px rgba(21, 68, 116, 0.18);
+    }
+    
+    .ellenco-title-box h1 {
+        color: #ffffff;
+        font-size: 1.65rem;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: -0.5px;
+    }
+    
+    .ellenco-title-box p {
+        color: #dbeafe;
+        font-size: 0.88rem;
+        margin: 4px 0 0 0;
+        font-weight: 400;
+    }
+
+    .ellenco-badge-file {
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(4px);
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        color: #f1f5f9;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        text-align: right;
+    }
+
+    /* Cartões de Métricas (KPIs) */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px 18px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        border-left: 4px solid #154474;
+    }
+    
+    div[data-testid="stMetric"]:hover {
+        box-shadow: 0 4px 12px rgba(21, 68, 116, 0.12);
+        border-left: 4px solid #EE3E3F;
+        transition: all 0.2s ease-in-out;
+    }
+
+    div[data-testid="stMetricLabel"] {
+        color: #64748b;
+        font-size: 0.82rem !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #0f172a;
+        font-size: 1.75rem !important;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+
+    /* Títulos de Seção */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #154474;
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-top: 15px;
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .section-tag {
+        background-color: #EE3E3F;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    /* Cartões Executivos Inferiores */
+    .dest-card {
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+        height: 100%;
+        background-color: #ffffff;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    
     .dest-header {
         display: flex;
         align-items: center;
         gap: 10px;
         margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e2e8f0;
     }
+    
     .dest-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        font-size: 19px;
+        background-color: #f1f5f9;
+        border: 1px solid #e2e8f0;
     }
+    
     .dest-title {
-        font-size: 0.98rem;
+        font-size: 0.95rem;
         font-weight: 700;
+        color: #154474;
         margin: 0;
         line-height: 1.2;
     }
+    
     .dest-subtitle {
-        font-size: 0.80rem;
-        color: #6b7280;
-        margin: 0;
+        font-size: 0.78rem;
+        color: #64748b;
+        margin: 2px 0 0 0;
     }
+    
     .item-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 0.82rem;
         background-color: #ffffff;
-        border-radius: 8px;
+        border-radius: 6px;
         overflow: hidden;
     }
+    
     .item-table th {
-        background-color: #f3f4f6;
-        color: #374151;
+        background-color: #f8fafc;
+        color: #475569;
         padding: 6px 8px;
         font-weight: 600;
         text-align: left;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid #e2e8f0;
     }
+    
     .item-table td {
-        padding: 6px 8px;
-        border-bottom: 1px solid #f3f4f6;
-        color: #1f2937;
+        padding: 7px 8px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
         vertical-align: middle;
     }
+    
     .item-num {
-        width: 26px;
-        height: 26px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 0.80rem;
+        font-size: 0.75rem;
     }
 </style>
 """,
@@ -91,7 +217,9 @@ st.markdown(
 )
 
 
-# Função para formatar moeda brasileira
+# ==============================================================================
+# FUNÇÕES DE FORMATAÇÃO E SUPORTE
+# ==============================================================================
 def formatar_moeda(valor):
   try:
     val_float = float(valor)
@@ -104,7 +232,6 @@ def formatar_moeda(valor):
     return "R$ 0,00"
 
 
-# Função para formatar data (DD/MM/AAAA)
 def formatar_data(val):
   if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
     return "-"
@@ -115,7 +242,6 @@ def formatar_data(val):
     return str(val)
 
 
-# Função para formatar número do sinistro
 def formatar_sinistro(val):
   if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
     return "-"
@@ -126,7 +252,6 @@ def formatar_sinistro(val):
     return str(val).strip()
 
 
-# Função para carregar a planilha mais recente do repositório
 def carregar_dados_repositorio():
   arquivos = [
       f for f in glob.glob("*.xlsx") if not os.path.basename(f).startswith("~$")
@@ -134,7 +259,6 @@ def carregar_dados_repositorio():
   if not arquivos:
     return None, None, None
 
-  # Seleciona sempre o arquivo mais recente pela data de modificação
   arquivo_mais_recente = max(arquivos, key=os.path.getmtime)
   data_modificacao = datetime.fromtimestamp(
       os.path.getmtime(arquivo_mais_recente)
@@ -142,7 +266,6 @@ def carregar_dados_repositorio():
 
   df = pd.read_excel(arquivo_mais_recente)
 
-  # Identificar coluna de status/fase
   col_fase = None
   for col in df.columns:
     if str(col).strip().lower() in ["fase atual", "status", "fase"]:
@@ -158,7 +281,6 @@ def carregar_dados_repositorio():
 
   df["Fase_Normalizada"] = df[col_fase].astype(str).str.strip().str.lower()
 
-  # Filtro estrito: apenas processos em andamento
   fases_alvo = [
       "acompanhamento de sinistro",
       "análise do incidente",
@@ -173,14 +295,29 @@ def carregar_dados_repositorio():
 
 df, nome_arquivo, info_data = carregar_dados_repositorio()
 
-# Cabeçalho Principal
-st.title("🚗 Painel Executivo de Sinistros & Gestão de Risco")
-if nome_arquivo:
-  st.caption(
-      f"📁 **Base ativa carregada:** `{nome_arquivo}` | **Última"
-      f" atualização:** {info_data}"
-  )
-else:
+# ==============================================================================
+# CABEÇALHO CORPORATIVO ELLENCO
+# ==============================================================================
+header_html = f"""
+<div class="ellenco-header">
+    <div class="ellenco-title-box">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+            <span style="background-color: #EE3E3F; color: #ffffff; padding: 2px 8px; border-radius: 4px; font-weight: 800; font-size: 0.72rem; letter-spacing: 1px;">ELLENCO</span>
+            <span style="font-size: 0.82rem; color: #93c5fd; font-weight: 500;">GESTÃO DE RISCOS & SINISTROS</span>
+        </div>
+        <h1>Painel Executivo de Sinistros & Frotas</h1>
+        <p>Monitoramento integrado de processos em regulação, perícias, alocações de obra e liquidações securitárias.</p>
+    </div>
+    <div class="ellenco-badge-file">
+        <div style="font-weight: 700; color: #ffffff;">BASE ATIVA PIPEFY</div>
+        <div style="margin-top: 2px;">📄 <code>{nome_arquivo if nome_arquivo else 'Nenhum arquivo'}</code></div>
+        <div style="color: #cbd5e1; font-size: 0.72rem; margin-top: 2px;">Atualizado em: {info_data if info_data else '-'}</div>
+    </div>
+</div>
+"""
+st.markdown(header_html, unsafe_allow_html=True)
+
+if not nome_arquivo:
   st.error(
       "⚠️ Nenhuma planilha Excel (.xlsx) encontrada na raiz do repositório."
   )
@@ -193,12 +330,11 @@ if df is None or df.empty:
   )
   st.stop()
 
-# ==========================================
-# IDENTIFICAÇÃO PRIORITÁRIA DA COLUNA CC
-# ==========================================
+# ==============================================================================
+# IDENTIFICAÇÃO PRIORITÁRIA DA COLUNA CC / OBRA
+# ==============================================================================
 col_cc = None
 
-# 1. Busca exata por "CC"
 for col in df.columns:
   if str(col).strip().upper() in [
       "CC",
@@ -210,21 +346,19 @@ for col in df.columns:
     col_cc = col
     break
 
-# 2. Busca por coluna que comece com "CC"
 if not col_cc:
   for col in df.columns:
     if str(col).strip().upper().startswith("CC"):
       col_cc = col
       break
 
-# 3. Fallback para Obra relacionada
 if not col_cc:
   for col in df.columns:
     if "informe a obra a qual" in str(col).strip().lower():
       col_cc = col
       break
 
-# Mapeamento das colunas de sinistro, valores e datas
+# Mapeamento securitário
 col_sinistro_seg = (
     "Número do sinistro (segurado)"
     if "Número do sinistro (segurado)" in df.columns
@@ -264,7 +398,6 @@ col_data_ter = [
 col_data_ter = col_data_ter[0] if col_data_ter else None
 
 
-# Limpeza e Padronização do Centro de Custo / Locação
 def padronizar_cc(val):
   if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
     return "Não informado / Operacional"
@@ -283,10 +416,14 @@ df["CC_Padronizado"] = (
 )
 df["Item_ID"] = [f"#{i + 1}" for i in range(len(df))]
 
-# ==========================================
-# 1. RESUMO EXECUTIVO (MÉTRICAS)
-# ==========================================
-st.subheader("1. Visão Geral da Carteira")
+# ==============================================================================
+# 1. RESUMO EXECUTIVO (MÉTRICAS / KPIS)
+# ==============================================================================
+st.markdown(
+    '<div class="section-header"><span class="section-tag">01</span> VISÃO'
+    ' GERAL DA CARTEIRA</div>',
+    unsafe_allow_html=True,
+)
 
 total_ocorrencias = len(df)
 sinistros_abertos = len(df[df["Fase_Normalizada"] == "acompanhamento de sinistro"])
@@ -318,37 +455,58 @@ m1.metric("Ocorrências em Andamento", f"{total_ocorrencias}")
 m2.metric(
     "Sinistros Abertos (Regulação)",
     f"{sinistros_abertos}",
-    f"{pct_sinistros:.1f}% do total",
+    f"{pct_sinistros:.1f}% da carteira",
 )
 m3.metric(
     "Em Análise Prévia (Incidente)",
     f"{fase_analise}",
-    f"{pct_analise:.1f}% do total",
+    f"{pct_analise:.1f}% da carteira",
 )
 m4.metric("Total Indenizado / Estimado", formatar_moeda(total_indenizado))
 
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
-# ==========================================
-# 2. GARGALOS E PENDÊNCIAS OPERACIONAIS
-# ==========================================
-st.subheader("2. Gargalos e Pendências Operacionais")
+# ==============================================================================
+# 2. STATUS DO FLUXO E GARGALOS OPERACIONAIS
+# ==============================================================================
+st.markdown(
+    '<div class="section-header"><span class="section-tag">02</span> GARGALOS'
+    ' OPERACIONAIS & PIPELINE PIPEFY</div>',
+    unsafe_allow_html=True,
+)
 
-col_left, col_right = st.columns([1, 1])
+col_left, col_right = st.columns([1, 1.1])
 
 with col_left:
-  st.markdown("#### Distribuição por Fase")
+  st.markdown("##### Distribuição de Casos por Fase")
   fig_fase = px.pie(
       df,
       names="Fase atual",
-      hole=0.45,
-      color_discrete_sequence=["#1f77b4", "#ff7f0e"],
+      hole=0.48,
+      color="Fase atual",
+      color_discrete_map={
+          "Acompanhamento de Sinistro": "#154474",
+          "Análise do Incidente": "#EE3E3F",
+      },
   )
-  fig_fase.update_layout(margin=dict(t=20, b=20, l=10, r=10))
+  fig_fase.update_traces(
+      textinfo="percent+value",
+      textfont=dict(size=13, family="Inter, sans-serif", color="#ffffff"),
+      marker=dict(line=dict(color="#ffffff", width=2)),
+  )
+  fig_fase.update_layout(
+      margin=dict(t=20, b=20, l=10, r=10),
+      legend=dict(
+          orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5
+      ),
+      paper_bgcolor="rgba(0,0,0,0)",
+      plot_bgcolor="rgba(0,0,0,0)",
+      height=320,
+  )
   st.plotly_chart(fig_fase, use_container_width=True)
 
 with col_right:
-  st.markdown("#### Detalhamento por Processo")
+  st.markdown("##### Detalhamento de Pendências & Regulação")
   col_local = "Informe a obra ou endereço completo do ocorrido:"
   col_causa = "Informe a Causa"
   col_tipo = "Informe o tipo da ocorrencia"
@@ -377,23 +535,26 @@ with col_right:
     val_ter = formatar_moeda(row.get(col_val_ter)) if col_val_ter else "R$ 0,00"
     data_ter = formatar_data(row.get(col_data_ter)) if col_data_ter else "-"
 
-    with st.expander(f"📌 [{num_item}] {titulo} — [{fase}]"):
-      st.markdown(f"**🚗 Veículo / Descrição:** {titulo}")
+    cor_status = "#154474" if "acompanhamento" in str(fase).lower() else "#EE3E3F"
+
+    with st.expander(f"📌 [{num_item}] {titulo} — ({fase})"):
+      st.markdown(f"**🚗 Veículo / Descrição:** `{titulo}`")
       st.markdown(f"**🏢 Centro de Custo / Locação:** `{cc_val}`")
       st.markdown(f"**📍 Local/Endereço:** {local_val}")
       st.markdown(f"**⚠️ Causa / Tipo:** {causa_val} ({tipo_val})")
 
       st.markdown("---")
-      st.markdown("**📋 Dados do Sinistro e Indenizações:**")
       c_seg, c_ter = st.columns(2)
       with c_seg:
-        st.markdown(f"- **Sinistro Segurado:** `{sinistro_seg}`")
-        st.markdown(f"- **Valor Indenizado:** `{val_seg}`")
-        st.markdown(f"- **Data Indenização:** `{data_seg}`")
+        st.markdown(
+            f"**Segurado:** Sinistro: `{sinistro_seg}` | Indenizado:"
+            f" `{val_seg}` | Data: `{data_seg}`"
+        )
       with c_ter:
-        st.markdown(f"- **Sinistro Terceiro:** `{sinistro_ter}`")
-        st.markdown(f"- **Valor Indenizado:** `{val_ter}`")
-        st.markdown(f"- **Data Indenização:** `{data_ter}`")
+        st.markdown(
+            f"**Terceiro:** Sinistro: `{sinistro_ter}` | Indenizado:"
+            f" `{val_ter}` | Data: `{data_ter}`"
+        )
 
       st.markdown("---")
       st.markdown(f"**🕒 Atualizado em:** {atualizado_val}")
@@ -402,59 +563,63 @@ with col_right:
       else:
         st.write("*Sem comentários registrados no card.*")
 
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
-# ==========================================
-# 3. SINISTRALIDADE POR DESTINAÇÃO / CC E MOTIVOS DAS OCORRÊNCIAS
-# ==========================================
-st.subheader("3. Sinistralidade por Destinação (CC) e Motivos das Ocorrências")
+# ==============================================================================
+# 3. SINISTRALIDADE POR DESTINAÇÃO / CC E MOTIVOS (PALETA CORPORATIVA ELLENCO)
+# ==============================================================================
+st.markdown(
+    '<div class="section-header"><span class="section-tag">03</span>'
+    ' SINISTRALIDADE POR DESTINAÇÃO (CC) & MOTIVOS</div>',
+    unsafe_allow_html=True,
+)
 
 col_g1, col_g2 = st.columns([1.1, 0.9])
 
-paleta_cores = {
+# Paleta corporativa: Tons derivados do Azul Ellenco (#154474) e Vermelho Ellenco (#EE3E3F)
+paleta_ellenco = {
     0: {
-        "bar": "#2b70b8",
-        "bg": "#f0f7ff",
-        "border": "#bfdbfe",
-        "icon_bg": "#dbeafe",
-        "badge": "#2563eb",
+        "bar": "#154474",
+        "bg": "#f0f5fa",
+        "border": "#cbd8e6",
+        "icon_bg": "#dbe8f4",
+        "badge": "#154474",
         "icon": "🚚",
     },
     1: {
-        "bar": "#569e87",
-        "bg": "#f0fdf4",
-        "border": "#bbf7d0",
-        "icon_bg": "#dcfce7",
-        "badge": "#16a34a",
+        "bar": "#226aa8",
+        "bg": "#f4f8fc",
+        "border": "#d2e3f1",
+        "icon_bg": "#e3effa",
+        "badge": "#226aa8",
         "icon": "🏭",
     },
     2: {
-        "bar": "#d8b671",
+        "bar": "#d97706",
         "bg": "#fffbeb",
         "border": "#fde68a",
         "icon_bg": "#fef3c7",
-        "badge": "#d97706",
+        "badge": "#b45309",
         "icon": "🛣️",
     },
     3: {
-        "bar": "#968bbd",
-        "bg": "#faf5ff",
-        "border": "#e9d5ff",
-        "icon_bg": "#f3e8ff",
-        "badge": "#9333ea",
+        "bar": "#64748b",
+        "bg": "#f8fafc",
+        "border": "#e2e8f0",
+        "icon_bg": "#f1f5f9",
+        "badge": "#475569",
         "icon": "⚙️",
     },
     4: {
-        "bar": "#e07a5f",
-        "bg": "#fff7ed",
-        "border": "#fed7aa",
-        "icon_bg": "#ffedd5",
-        "badge": "#ea580c",
+        "bar": "#EE3E3F",
+        "bg": "#fef2f2",
+        "border": "#fecaca",
+        "icon_bg": "#fee2e2",
+        "badge": "#EE3E3F",
         "icon": "📍",
     },
 }
 
-# Agrupamento por CC / Destinação
 df_agrupado = (
     df.groupby("CC_Padronizado", as_index=False)
     .agg(Quantidade=("Título", "count"))
@@ -463,12 +628,11 @@ df_agrupado = (
 )
 
 bar_colors = [
-    paleta_cores.get(i % len(paleta_cores))["bar"]
+    paleta_ellenco.get(i % len(paleta_ellenco))["bar"]
     for i in range(len(df_agrupado))
 ]
 
 with col_g1:
-  # 1. Gráfico das Destinações / Obras
   fig_dest = go.Figure()
   fig_dest.add_trace(
       go.Bar(
@@ -476,11 +640,16 @@ with col_g1:
           y=df_agrupado["Quantidade"],
           text=df_agrupado["Quantidade"],
           textposition="outside",
-          textfont=dict(size=15, family="Arial, sans-serif", color="#111827"),
-          marker=dict(
-              color=bar_colors, line=dict(color="rgba(0,0,0,0.1)", width=1)
+          textfont=dict(
+              size=14,
+              family="Inter, sans-serif",
+              color="#0f172a",
+              weight="bold",
           ),
-          width=0.45,
+          marker=dict(
+              color=bar_colors, line=dict(color="#ffffff", width=1.5)
+          ),
+          width=0.42,
       )
   )
 
@@ -489,8 +658,8 @@ with col_g1:
       title=dict(
           text=(
               "<b>Ocorrências por Destinação / CC</b><br><span"
-              " style='font-size:12px;color:#6b7280;font-weight:normal;'>Volume"
-              " por Unidade / Locação</span>"
+              " style='font-size:12px;color:#64748b;'>Volume de processos por"
+              " obra / contrato de locação</span>"
           ),
           x=0.01,
           y=0.96,
@@ -498,14 +667,14 @@ with col_g1:
       yaxis=dict(
           title="Quantidade de Ocorrências",
           range=[0, max_val_dest + 0.6],
-          gridcolor="#e5e7eb",
+          gridcolor="#f1f5f9",
           showline=True,
-          linecolor="#9ca3af",
+          linecolor="#cbd5e1",
           tickmode="linear",
           tick0=0,
           dtick=0.5,
       ),
-      xaxis=dict(title="", showline=True, linecolor="#9ca3af", tickangle=-15),
+      xaxis=dict(title="", showline=True, linecolor="#cbd5e1", tickangle=-12),
       plot_bgcolor="#ffffff",
       paper_bgcolor="#ffffff",
       margin=dict(t=65, b=40, l=50, r=10),
@@ -514,7 +683,6 @@ with col_g1:
   st.plotly_chart(fig_dest, use_container_width=True)
 
 with col_g2:
-  # 2. Gráfico dos Motivos das Ocorrências (Principais Causas)
   col_tipo_ocorr = "Informe o tipo da ocorrencia"
   col_causa_raiz = "Informe a Causa"
 
@@ -526,46 +694,62 @@ with col_g2:
   motivos_counts = serie_motivos.value_counts().reset_index()
   motivos_counts.columns = ["Motivo / Tipo", "Quantidade"]
 
-  fig_motivos = px.bar(
-      motivos_counts,
-      x="Motivo / Tipo",
-      y="Quantidade",
-      text="Quantidade",
-      title=(
-          "<b>Principais Motivos das Ocorrências</b><br><span"
-          " style='font-size:12px;color:#6b7280;font-weight:normal;'>Distribuição"
-          " por Causa Raiz</span>"
-      ),
-      color="Quantidade",
-      color_continuous_scale="Reds",
+  fig_motivos = go.Figure()
+  fig_motivos.add_trace(
+      go.Bar(
+          x=motivos_counts["Motivo / Tipo"],
+          y=motivos_counts["Quantidade"],
+          text=motivos_counts["Quantidade"],
+          textposition="outside",
+          textfont=dict(
+              size=14,
+              family="Inter, sans-serif",
+              color="#0f172a",
+              weight="bold",
+          ),
+          marker=dict(
+              color=[
+                  "#EE3E3F" if i == 0 else "#fca5a5"
+                  for i in range(len(motivos_counts))
+              ],
+              line=dict(color="#ffffff", width=1.5),
+          ),
+          width=0.42,
+      )
   )
-  fig_motivos.update_traces(
-      textposition="outside",
-      textfont=dict(size=15, family="Arial, sans-serif", color="#111827"),
-      width=0.45,
-  )
+
   max_val_mot = (
       motivos_counts["Quantidade"].max() if not motivos_counts.empty else 4
   )
   fig_motivos.update_layout(
+      title=dict(
+          text=(
+              "<b>Principais Motivos das Ocorrências</b><br><span"
+              " style='font-size:12px;color:#64748b;'>Classificação dos eventos"
+              " por tipologia</span>"
+          ),
+          x=0.01,
+          y=0.96,
+      ),
       yaxis=dict(
           title="Quantidade",
-          range=[0, max_val_mot + 1],
-          gridcolor="#e5e7eb",
+          range=[0, max_val_mot + 0.8],
+          gridcolor="#f1f5f9",
           showline=True,
-          linecolor="#9ca3af",
+          linecolor="#cbd5e1",
       ),
-      xaxis=dict(title="", showline=True, linecolor="#9ca3af"),
+      xaxis=dict(title="", showline=True, linecolor="#cbd5e1"),
       plot_bgcolor="#ffffff",
       paper_bgcolor="#ffffff",
       margin=dict(t=65, b=40, l=40, r=10),
       height=350,
-      coloraxis_showscale=False,
   )
   st.plotly_chart(fig_motivos, use_container_width=True)
 
 # 3. Cartões Executivos Inferiores com Detalhamento dos Itens
-st.markdown("#### 📋 Detalhamento dos Itens por Destinação")
+st.markdown(
+    "##### Detalhamento Nominal dos Veículos / Ocorrências por Destinação"
+)
 
 num_destinacoes = len(df_agrupado)
 if num_destinacoes > 0:
@@ -575,7 +759,7 @@ if num_destinacoes > 0:
     nome_cc = row_cc["CC_Padronizado"]
     total_cc = row_cc["Quantidade"]
     itens_cc = df[df["CC_Padronizado"] == nome_cc].reset_index(drop=True)
-    estilo = paleta_cores.get(i % len(paleta_cores))
+    estilo = paleta_ellenco.get(i % len(paleta_ellenco))
 
     linhas_html = []
     for n_item, item_row in itens_cc.iterrows():
@@ -590,13 +774,12 @@ if num_destinacoes > 0:
           and str(sinistro_val).lower() != "nan"
       ):
         sinistro_info = (
-            " <span style='font-size:0.75rem;color:#6b7280;'>(Sinistro "
-            + formatar_sinistro(sinistro_val)
-            + ")</span>"
+            " <span style='font-size:0.75rem;color:#EE3E3F;font-weight:600;'>(Sinistro"
+            f" {formatar_sinistro(sinistro_val)})</span>"
         )
 
       linha = (
-          "<tr><td style='text-align:center; width:35px;'><span"
+          "<tr><td style='text-align:center; width:32px;'><span"
           " class='item-num' style='background-color:"
           + estilo["icon_bg"]
           + "; color:"
@@ -618,24 +801,28 @@ if num_destinacoes > 0:
         + estilo["bg"]
         + "; border:1.5px solid "
         + estilo["border"]
+        + "; border-top: 4px solid "
+        + estilo["bar"]
         + ";'>"
         "<div class='dest-header'>"
         "<div class='dest-icon' style='background-color:"
         + estilo["icon_bg"]
+        + "; color:"
+        + estilo["badge"]
         + ";'>"
         + estilo["icon"]
         + "</div>"
         "<div><h4 class='dest-title'>"
         + str(nome_cc)
         + "</h4>"
-        "<p class='dest-subtitle'>Total: "
+        "<p class='dest-subtitle'>Total: <b>"
         + str(total_cc)
-        + " ocorrência"
+        + "</b> ocorrência"
         + ("s" if total_cc > 1 else "")
         + "</p></div>"
         "</div>"
         "<table class='item-table'>"
-        "<thead><tr><th style='width:35px; text-align:center;'>Nº</th><th>Item"
+        "<thead><tr><th style='width:32px; text-align:center;'>Nº</th><th>Item"
         " / Veículo</th></tr></thead>"
         "<tbody>" + tabela_corpo + "</tbody>"
         "</table>"
@@ -645,12 +832,16 @@ if num_destinacoes > 0:
     with card_cols[i]:
       st.markdown(html_card, unsafe_allow_html=True)
 
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
-# ==========================================
+# ==============================================================================
 # 4. TABELA EXECUTIVA: VEÍCULOS, SINISTROS E INDENIZAÇÕES
-# ==========================================
-st.subheader("4. Relação Geral: Veículos, Sinistros e Valores Indenizados")
+# ==============================================================================
+st.markdown(
+    '<div class="section-header"><span class="section-tag">04</span> RELATÓRIO'
+    ' GERAL DE PROCESSOS, SINISTROS & INDENIZAÇÕES</div>',
+    unsafe_allow_html=True,
+)
 
 tabela_executiva = pd.DataFrame()
 tabela_executiva["Item"] = df["Item_ID"]
